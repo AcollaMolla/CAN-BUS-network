@@ -30,16 +30,16 @@ void loop(){
 
 void sendCAN(void *pvParameters){
   while(1){
+    stmp[0] = random(0x10, 0xab);
     peerRequestCounter++;
     if(peerRequestCounter == 10){
       stmp[0] = 0x40;
       peerRequestCounter = 0;
     }
-    else if(stmp[0] == 0x40){
-      stmp[0] = 0x41;
-    }
     CAN.sendMsgBuf(0x1, 0, 8, stmp);
-    SERIAL_PORT_MONITOR.println("Send message");
+    SERIAL_PORT_MONITOR.print("Send request to: ");
+    SERIAL_PORT_MONITOR.print("0x");
+    SERIAL_PORT_MONITOR.println(stmp[0], HEX);
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
 }
@@ -52,7 +52,7 @@ void receiveCAN(void *pvParameters){
       CAN.readMsgBuf(&len, buf);    // read data,  len: data length, buf: data buf
       unsigned long canId = CAN.getCanId();
       if(canId == 0x2fe){
-        SERIAL_PORT_MONITOR.println("Peer replied!");
+        SERIAL_PORT_MONITOR.print("Peer replied! Reply: ");
         for(int i=0;i<len;i++){
           SERIAL_PORT_MONITOR.print(buf[i], HEX);SERIAL_PORT_MONITOR.print("\t");
         }
