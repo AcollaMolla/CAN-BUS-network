@@ -3,6 +3,7 @@
 
 void sendCAN(void *pvParameters);
 void receiveCAN(void *pvParameters);
+void temperatureReading(void *pvParameters);
 void reply();
 
 const int SPI_CS_PIN = 10;
@@ -18,13 +19,32 @@ void setup(){
   }
   
   SERIAL_PORT_MONITOR.println("CAN init ok!");
-  xTaskCreate(sendCAN, "sendCAN", 128, NULL, 3, NULL);
+  xTaskCreate(sendCAN, "sendCAN", 128, NULL, 4, NULL);
   xTaskCreate(receiveCAN, "receiveCAN", 128, NULL, 2, NULL);
+  //xTaskCreate(temperatureReading, "temperatureReading", 128, NULL, 3, NULL);
   vTaskStartScheduler();
 }
 
 void loop(){
   
+}
+
+void temperatureReading(void *pvParameters){
+  int ThermistorPin = 0;
+  int Vo;
+  float R1 = 10000;
+  float logR2, R2, T;
+  float c1 = 1.009249522e-03, c2 = 2.378405444e-04, c3 = 2.019202697e-07;
+  while(1){
+    Vo = analogRead(ThermistorPin);
+    R2 = R1 * (1023.0 / (float)Vo - 1.0);
+    logR2 = log(R2);
+    T = (1.0 / (c1 + c2*logR2 + c3*logR2*logR2*logR2));
+    T = T - 273.15;
+    Serial.print("Temp: ");
+    Serial.println(T);
+    vTaskDelay(200/portTICK_PERIOD_MS);
+  }
 }
 
 void sendCAN(void *pvParameters){
