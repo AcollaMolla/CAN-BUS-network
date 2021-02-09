@@ -52,8 +52,14 @@ void receiveCAN(void *pvParameters){
 }
 
 void reply(){
-  SERIAL_PORT_MONITOR.println("Replied!");
   response[0] = random(0x1e, 0xff);
   response[1] = random(0x0, 0xff);
   CAN.sendMsgBuf(0x2fe, 0, 2, response);
+  SERIAL_PORT_MONITOR.print("Replied with: ");
+  for(int i=0;i<2;i++){
+    SERIAL_PORT_MONITOR.print("0x");
+    SERIAL_PORT_MONITOR.print(response[i]);
+    SERIAL_PORT_MONITOR.print(" ");
+  }
+  SERIAL_PORT_MONITOR.println();
 }
