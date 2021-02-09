@@ -6,7 +6,8 @@ void receiveCAN(void *pvParameters);
 
 const int SPI_CS_PIN = 10;
 mcp2515_can CAN(SPI_CS_PIN); // Set CS pin
-unsigned char stmp[8] = {0x40, 0x1, 0x01, 0x01, 0, 0, 0, 0};
+unsigned char stmp[8] = {0x41, 0x1, 0x01, 0x01, 0, 0, 0, 0};
+int peerRequestCounter = 0;
 
 void setup(){
   SERIAL_PORT_MONITOR.begin(115200);
@@ -29,6 +30,14 @@ void loop(){
 
 void sendCAN(void *pvParameters){
   while(1){
+    peerRequestCounter++;
+    if(peerRequestCounter == 10){
+      stmp[0] = 0x40;
+      peerRequestCounter = 0;
+    }
+    else if(stmp[0] == 0x40){
+      stmp[0] = 0x41;
+    }
     CAN.sendMsgBuf(0x1, 0, 8, stmp);
     SERIAL_PORT_MONITOR.println("Send message");
     vTaskDelay(1000/portTICK_PERIOD_MS);
@@ -47,8 +56,8 @@ void receiveCAN(void *pvParameters){
         for(int i=0;i<len;i++){
           SERIAL_PORT_MONITOR.print(buf[i], HEX);SERIAL_PORT_MONITOR.print("\t");
         }
+         SERIAL_PORT_MONITOR.println("");
       }
-      SERIAL_PORT_MONITOR.println("");
     }
     vTaskDelay(100/portTICK_PERIOD_MS);
   }
