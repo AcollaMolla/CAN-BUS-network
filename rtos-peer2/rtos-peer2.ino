@@ -3,6 +3,7 @@
 
 void sendCAN(void *pvParameters);
 void receiveCAN(void *pvParameters);
+void reply();
 
 const int SPI_CS_PIN = 10;
 mcp2515_can CAN(SPI_CS_PIN); // Set CS pin
@@ -29,7 +30,7 @@ void loop(){
 void sendCAN(void *pvParameters){
   while(1){
     CAN.sendMsgBuf(0x3fe, 0, 2, response);
-    SERIAL_PORT_MONITOR.println("Replied!");
+    SERIAL_PORT_MONITOR.println("Sending!");
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
 }
@@ -43,8 +44,14 @@ void receiveCAN(void *pvParameters){
       unsigned long canId = CAN.getCanId();
       if(buf[0] == 0x40){
         SERIAL_PORT_MONITOR.println("Someone called me!");
+        reply();
       }
     }
     vTaskDelay(100/portTICK_PERIOD_MS);
   }
+}
+
+void reply(){
+  SERIAL_PORT_MONITOR.println("Replied!");
+  CAN.sendMsgBuf(0x2fe, 0, 2, response);
 }

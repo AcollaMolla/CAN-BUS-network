@@ -29,7 +29,7 @@ void loop(){
 
 void sendCAN(void *pvParameters){
   while(1){
-    CAN.sendMsgBuf(0x000ffffe, 1, 8, stmp);
+    CAN.sendMsgBuf(0x1, 0, 8, stmp);
     SERIAL_PORT_MONITOR.println("Send message");
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
@@ -48,6 +48,7 @@ void receiveCAN(void *pvParameters){
           SERIAL_PORT_MONITOR.print(buf[i], HEX);SERIAL_PORT_MONITOR.print("\t");
         }
       }
+      SERIAL_PORT_MONITOR.println("");
     }
     vTaskDelay(100/portTICK_PERIOD_MS);
   }
