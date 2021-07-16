@@ -1,27 +1,39 @@
 #include <Arduino_FreeRTOS.h>
-#include "mcp2515_can.h"
+#include <mcp2515.h>
 
 void sendCAN(void *pvParameters);
 void receiveCAN(void *pvParameters);
-void temperatureReading(void *pvParameters);
-void reply();
+
+struct can_frame canMsg;
+struct can_frame toSend;
 
 const int SPI_CS_PIN = 10;
-mcp2515_can CAN(SPI_CS_PIN); // Set CS pin
-unsigned char response[2] = {0x3e, 0x1};
+MCP2515 mcp2515(SPI_CS_PIN);
+int peerRequestCounter = 0;
+
 
 void setup(){
-  SERIAL_PORT_MONITOR.begin(115200);
-  while(!Serial){};
-  while (CAN_OK != CAN.begin(CAN_125KBPS)) {             // init can bus : baudrate = 500k
-    SERIAL_PORT_MONITOR.println("CAN init fail, retry...");
-    delay(100);
-  }
+  toSend.can_id = 0xff;
+  toSend.can_dlc = 8;
+  toSend.data[0] = 0x44;
+  toSend.data[1] = 0xdf;
+  toSend.data[2] = 0x12;
+  toSend.data[3] = 0x65;
+  toSend.data[4] = 0x0;
+  toSend.data[5] = 0x5;
+  toSend.data[6] = 0x5;
+  toSend.data[7] = 0xee;
   
-  SERIAL_PORT_MONITOR.println("CAN init ok!");
-  xTaskCreate(sendCAN, "sendCAN", 128, NULL, 4, NULL);
+  Serial.begin(115200);
+  mcp2515.reset();
+  mcp2515.setBitrate(CAN_125KBPS);
+  mcp2515.setNormalMode();
+  
+  Serial.println("------- CAN Read ----------");
+  Serial.println("ID  DLC   DATA");
+
+  xTaskCreate(sendCAN, "sendCAN", 128, NULL, 3, NULL);
   xTaskCreate(receiveCAN, "receiveCAN", 128, NULL, 2, NULL);
-  xTaskCreate(temperatureReading, "temperatureReading", 128, NULL, 3, NULL);
   vTaskStartScheduler();
 }
 
@@ -29,26 +41,11 @@ void loop(){
   
 }
 
-void temperatureReading(void *pvParameters){
-  float reading = 0;
-  float adc = 0;
-  
-  while(1){
-    reading = analogRead(A0);
-    adc = reading/(reading+10000)*3.3*(1023/reading);
-    reading = (1023/reading)-1;
-    reading = 10000/reading;
-    Serial.print("Resistance: ");
-    Serial.println(reading);
-    vTaskDelay(200/portTICK_PERIOD_MS);
-  }
-}
-
 void sendCAN(void *pvParameters){
   while(1){
-    CAN.sendMsgBuf(0x3fe, 0, 2, response);
-    SERIAL_PORT_MONITOR.println("Sending!");
-    vTaskDelay(10000/portTICK_PERIOD_MS);
+    toSend.data[0] = random(0x10, 0xab);
+    mcp2515.sendMessage(&toSend);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
   }
 }
 
@@ -56,27 +53,18 @@ void receiveCAN(void *pvParameters){
   unsigned char len = 0;
   unsigned char buf[8];
   while(1){
-    if (CAN_MSGAVAIL == CAN.checkReceive()) {         // check if data coming
-      CAN.readMsgBuf(&len, buf);    // read data,  len: data length, buf: data buf
-      unsigned long canId = CAN.getCanId();
-      if(buf[0] == 0x40){
-        SERIAL_PORT_MONITOR.println("Someone called me!");
-        reply();
+    if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
+      Serial.print(canMsg.can_id, HEX); // print ID
+      Serial.print(" "); 
+      Serial.print(canMsg.can_dlc, HEX); // print DLC
+      Serial.print(" ");
+    
+      for (int i = 0; i<canMsg.can_dlc; i++)  {  // print the data
+        Serial.print(canMsg.data[i],HEX);
+        Serial.print(" ");
       }
+      Serial.println();      
     }
     vTaskDelay(100/portTICK_PERIOD_MS);
   }
-}
-
-void reply(){
-  response[0] = random(0x1e, 0xff);
-  response[1] = random(0x0, 0xff);
-  CAN.sendMsgBuf(0x2fe, 0, 2, response);
-  SERIAL_PORT_MONITOR.print("Replied with: ");
-  for(int i=0;i<2;i++){
-    SERIAL_PORT_MONITOR.print("0x");
-    SERIAL_PORT_MONITOR.print(response[i]);
-    SERIAL_PORT_MONITOR.print(" ");
-  }
-  SERIAL_PORT_MONITOR.println();
 }
