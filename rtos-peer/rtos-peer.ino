@@ -6,10 +6,13 @@ void receiveCAN(void *pvParameters);
 
 struct can_frame canMsg;
 struct can_frame toSend;
+struct can_frame ping_request;
+struct can_frame ping_reply;
 
 const int SPI_CS_PIN = 10;
 MCP2515 mcp2515(SPI_CS_PIN);
 int peerRequestCounter = 0;
+bool pingReceived = false;
 
 
 void setup(){
@@ -23,7 +26,12 @@ void setup(){
   toSend.data[5] = 0x5;
   toSend.data[6] = 0x5;
   toSend.data[7] = 0xee;
-  
+
+  ping_request.can_id = 0x0;
+  ping_request.can_dlc = 2;
+  ping_request.data[0] = 0x0;
+  ping_request.data[1] = 0x0;
+   
   Serial.begin(115200);
   mcp2515.reset();
   mcp2515.setBitrate(CAN_125KBPS);
@@ -41,6 +49,13 @@ void loop(){
   
 }
 
+void sendAndReceivePing(void *pvParameter){
+  while(!pingReceived){
+    mcp2515.sendMessage(&toSend);
+    vTaskDelay(100/portTICK_PERIOD_MS);
+  }
+}
+
 void sendCAN(void *pvParameters){
   while(1){
     toSend.data[0] = random(0x10, 0xab);
@@ -54,6 +69,10 @@ void receiveCAN(void *pvParameters){
   unsigned char buf[8];
   while(1){
     if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
+      if(canMsg.can_id == 0x0 && (canMsg.data[0] & 0 == 0 && canMsg.data[1] & 0 == 0)){
+        pingReceived = true;
+        Serial.println("Ping reply received!");
+      }
       Serial.print(canMsg.can_id, HEX); // print ID
       Serial.print(" "); 
       Serial.print(canMsg.can_dlc, HEX); // print DLC
