@@ -13,10 +13,13 @@ const int SPI_CS_PIN = 10;
 MCP2515 mcp2515(SPI_CS_PIN);
 int peerRequestCounter = 0;
 bool pingReceived = false;
+int ping_val1 = 0;
+int ping_val2 = 0;
+int can_id = 0x0;
 
 
 void setup(){
-  toSend.can_id = 0xff;
+  toSend.can_id = can_id;
   toSend.can_dlc = 8;
   toSend.data[0] = 0x44;
   toSend.data[1] = 0xdf;
@@ -27,7 +30,7 @@ void setup(){
   toSend.data[6] = 0x5;
   toSend.data[7] = 0xee;
 
-  ping_request.can_id = 0x0;
+  ping_request.can_id = can_id;
   ping_request.can_dlc = 2;
   ping_request.data[0] = random(0x0, 0x5);
   ping_request.data[1] = random(0x0, 0x5);
@@ -52,6 +55,10 @@ void loop(){
 
 void sendPing(void *pvParameter){
   while(!pingReceived){
+      ping_val1 = random(0x5, 0xf);
+  ping_val2 = random(0x5, 0xf);
+  ping_request.data[0] = ping_val1;
+  ping_request.data[1] = ping_val2;
     Serial.print("Sending ping: ");
     Serial.print(ping_request.can_id, HEX);
     Serial.print(" ");
@@ -87,14 +94,17 @@ void receiveCAN(void *pvParameters){
   unsigned char buf[8];
   while(1){
     if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
-      if(canMsg.can_id == 0x0 && ((canMsg.data[0] > 0x0 && canMsg.data[0] < 0x5) && (canMsg.data[1] > 0x0 && canMsg.data[1] < 0x5))){
+      if(canMsg.can_id == 0x0 && ((canMsg.data[0] >= 0x5 && canMsg.data[0] <= 0xf) && (canMsg.data[1] >= 0x5 && canMsg.data[1] <= 0xf))){
         //pingReceived = true;
         Serial.println("Ping received!");
         sendPingAck(canMsg.data[0], canMsg.data[1]);
       }
       if(canMsg.can_id = 0x1 && (canMsg.data[0] == ping_request.data[0] && canMsg.data[1] == ping_request.data[1])){
         pingReceived = true;
+        can_id = (canMsg.data[0]);
         Serial.println("ACK received from slave");
+        Serial.println("Setting CAN ID to: " + can_id);
+        toSend.can_id = can_id;
       }
       Serial.print(canMsg.can_id, HEX); // print ID
       Serial.print(" "); 
