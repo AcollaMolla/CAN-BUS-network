@@ -7,7 +7,7 @@ void receiveCAN(void *pvParameters);
 struct can_frame canMsg;
 struct can_frame toSend;
 struct can_frame ping_request;
-struct can_frame ping_reply;
+struct can_frame ping_ack;
 
 const int SPI_CS_PIN = 10;
 MCP2515 mcp2515(SPI_CS_PIN);
@@ -29,8 +29,8 @@ void setup(){
 
   ping_request.can_id = 0x0;
   ping_request.can_dlc = 2;
-  ping_request.data[0] = 0x0;
-  ping_request.data[1] = 0x0;
+  ping_request.data[0] = random(0x0, 0x5);
+  ping_request.data[1] = random(0x0, 0x5);
    
   Serial.begin(115200);
   mcp2515.reset();
@@ -42,6 +42,7 @@ void setup(){
 
   xTaskCreate(sendCAN, "sendCAN", 128, NULL, 3, NULL);
   xTaskCreate(receiveCAN, "receiveCAN", 128, NULL, 2, NULL);
+  xTaskCreate(sendPing, "Send ping request", 128, NULL, 4, NULL);
   vTaskStartScheduler();
 }
 
@@ -49,11 +50,22 @@ void loop(){
   
 }
 
-void sendAndReceivePing(void *pvParameter){
+void sendPing(void *pvParameter){
   while(!pingReceived){
-    mcp2515.sendMessage(&toSend);
+    Serial.println("Sending ping...");  
+    mcp2515.sendMessage(&ping_request);
     vTaskDelay(100/portTICK_PERIOD_MS);
   }
+  vTaskDelete(NULL);
+}
+
+void sendPingAck(int val1, int val2){
+  ping_ack.can_id = 0x1;
+  ping_ack.can_dlc = 0x2;
+  ping_ack.data[0] = val1;
+  ping_ack.data[1] = val2;
+  mcp2515.sendMessage(&ping_ack);
+  Serial.println("Sent ping ack");
 }
 
 void sendCAN(void *pvParameters){
@@ -69,9 +81,14 @@ void receiveCAN(void *pvParameters){
   unsigned char buf[8];
   while(1){
     if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
-      if(canMsg.can_id == 0x0 && (canMsg.data[0] & 0 == 0 && canMsg.data[1] & 0 == 0)){
+      if(canMsg.can_id == 0x0 && ((canMsg.data[0] > 0x0 && canMsg.data[0] < 0x5) && (canMsg.data[1] > 0x0 && canMsg.data[1] < 0x5))){
+        //pingReceived = true;
+        Serial.println("Ping received!");
+        sendPingAck(canMsg.data[0], canMsg.data[1]);
+      }
+      if(canMsg.can_id = 0x1 && (canMsg.data[0] == ping_request.data[0] && canMsg.data[1] == ping_request.data[1])){
         pingReceived = true;
-        Serial.println("Ping reply received!");
+        Serial.println("ACK received from slave");
       }
       Serial.print(canMsg.can_id, HEX); // print ID
       Serial.print(" "); 
