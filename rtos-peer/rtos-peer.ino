@@ -52,7 +52,13 @@ void loop(){
 
 void sendPing(void *pvParameter){
   while(!pingReceived){
-    Serial.println("Sending ping...");  
+    Serial.print("Sending ping: ");
+    Serial.print(ping_request.can_id, HEX);
+    Serial.print(" ");
+    Serial.print(ping_request.can_dlc, HEX);
+    Serial.print(" ");
+    for(int i=0;i<2;i++){Serial.print(ping_request.data[i], HEX);Serial.print(" ");}
+    Serial.println();  
     mcp2515.sendMessage(&ping_request);
     vTaskDelay(100/portTICK_PERIOD_MS);
   }
